@@ -151,6 +151,27 @@ p.sub{font-size:13px;color:var(--txt-2);margin:0 0 14px}
 .sp .wh{font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:var(--txt-3);margin-top:1px}
 .meet{flex:none;border:1px solid var(--line-2);border-radius:999px;padding:6px 13px;font-size:12px;font-weight:800;color:var(--txt-2)}
 .meet.on{background:linear-gradient(90deg,var(--yel),var(--org));border:0;color:#3A1D00}
+
+/* ===== TRIP ROUTE ===== */
+.trip{display:flex;flex-direction:column}
+.leg{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:12px;color:var(--txt-2);padding:6px 4px 6px 18px;margin-left:12px;border-left:2px dashed var(--line-2)}
+.leg .legw{font-weight:700}
+.leg .legl{font-family:'IBM Plex Mono',monospace;color:var(--lim);font-size:11px;white-space:nowrap}
+.leg.same{color:var(--txt-3)}
+.visit{display:flex;gap:11px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:11px 12px}
+.visit .vnum{flex:none;width:26px;height:26px;border-radius:8px;display:grid;place-items:center;font-family:'IBM Plex Mono',monospace;font-weight:800;font-size:13px}
+.visit .vbd{flex:1;min-width:0}
+.visit .vhead{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px}
+.visit .vname{font-weight:800;font-size:13.5px}
+.visit .vev{display:flex;gap:9px;font-size:12.5px;line-height:1.35;padding:5px 0;border-top:1px solid var(--line)}
+.visit .vev:first-of-type{border-top:0;padding-top:0}
+.visit .vev .vt{font-family:'IBM Plex Mono',monospace;color:var(--txt-2);font-weight:600;flex:none;white-space:nowrap}
+.visit .vroom{font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:var(--txt-3)}
+.tripwarn{font-size:10px;font-weight:800;color:#FFC9A8;background:rgba(255,107,53,.18);border:1px solid rgba(255,107,53,.35);border-radius:5px;padding:1px 6px}
+.tripsum{display:flex;gap:16px;flex-wrap:wrap;align-items:center;background:var(--panel-2);border:1px solid var(--line-2);border-radius:12px;padding:12px 15px;margin:2px 0 14px;font-size:12px;color:var(--txt-2)}
+.tripsum b{font-family:Sora,sans-serif;font-size:16px;color:var(--cyn)}
+.rnum{width:26px;height:26px;border-radius:50%;background:#FF6B35;color:#fff;font-family:'IBM Plex Mono',monospace;font-weight:700;font-size:12px;display:grid;place-items:center;border:2px solid #fff;box-shadow:0 2px 7px rgba(0,0,0,.5)}
+.rnum.rbase{background:#25C9FF;font-size:13px}
 #toast{position:fixed;left:50%;bottom:18px;transform:translateX(-50%) translateY(80px);background:#fff;color:var(--navy);font-weight:800;font-size:13px;border-radius:999px;padding:11px 18px;box-shadow:var(--sh);transition:transform .25s;z-index:2000;max-width:92vw;text-align:center}
 #toast.on{transform:translateX(-50%) translateY(0)}
 footer{max-width:780px;margin:0 auto;padding:0 14px 26px;font-size:11.5px;color:var(--txt-3);display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap}
@@ -429,6 +450,15 @@ const gmaps=v=>{const d=encodeURIComponent(v.ad);
  base?`https://www.google.com/maps/dir/?api=1&origin=${base.lat},${base.lng}&destination=${d}&travelmode=walking`
  :`https://www.google.com/maps/dir/?api=1&destination=${d}&travelmode=walking`};
 const findEv=id=>{for(const d of DAYS){const e=d.ev.find(x=>x[0]===id);if(e)return{d,e}}};
+/* walk minutes between two venues (same model as walk(): detour ×1.35, 78 m/min) */
+const walkBetween=(a,b)=>{if(a.lat==null||b.lat==null)return null;
+ const R=6371000,r=x=>x*Math.PI/180;
+ const h=Math.sin(r(b.lat-a.lat)/2)**2+Math.cos(r(a.lat))*Math.cos(r(b.lat))*Math.sin(r(b.lng-a.lng)/2)**2;
+ return Math.max(1,Math.round(2*R*Math.asin(Math.sqrt(h))*1.35/78))};
+/* time helpers on "HH:MM" */
+const toMin=t=>{const[a,b]=t.split(":").map(Number);return a*60+b};
+const fromMin=m=>{m=((m%1440)+1440)%1440;return`${String(Math.floor(m/60)).padStart(2,"0")}:${String(m%60).padStart(2,"0")}`};
+const shiftT=(t,d)=>fromMin(toMin(t)+d);
 
 /* ================= MAP ================= */
 const map=L.map("map",{zoomControl:false}).setView(base?[base.lat,base.lng]:[42.3592,-71.0925],15);
@@ -460,16 +490,34 @@ $("#geo").onclick=()=>{const n=$("#geoNote");
   {enableHighAccuracy:true,timeout:9000})};
 if(base)drawBase();
 
+/* ================= TRIP ROUTE ON MAP ================= */
+let routeLayer=null;
+function clearRoute(){if(routeLayer){routeLayer.remove();routeLayer=null;}}
+function drawRoute(visits){
+ clearRoute();
+ routeLayer=L.layerGroup().addTo(map);
+ const nodes=[];
+ if(base)nodes.push({lat:base.lat,lng:base.lng,base:true});
+ visits.forEach((vt,i)=>{const v=vt.v;if(v.lat==null)return;nodes.push({lat:v.lat,lng:v.lng,num:i+1});});
+ if(!nodes.length){clearRoute();return;}
+ const latlngs=nodes.map(p=>[p.lat,p.lng]);
+ if(latlngs.length>1)L.polyline(latlngs,{color:"#FF6B35",weight:4,opacity:.9,dashArray:"1 9",lineCap:"round"}).addTo(routeLayer);
+ nodes.forEach(p=>{const html=p.base?'<div class="rnum rbase">🏠</div>':`<div class="rnum">${p.num}</div>`;
+  L.marker([p.lat,p.lng],{icon:L.divIcon({html,className:"",iconSize:[26,26],iconAnchor:[13,13]}),zIndexOffset:1000}).addTo(routeLayer);});
+ if(latlngs.length===1)map.setView(latlngs[0],16);
+ else map.fitBounds(L.latLngBounds(latlngs).pad(.35));
+}
+
 /* ================= TABS ================= */
-const TABS=["Overview","Schedule","My Agenda","Speakers"];
-const tabsEl=$("#tabs");let cur=store.get("f26_tab",1);
+const TABS=["Overview","Schedule","My Agenda","Speakers","My Trip"];
+const tabsEl=$("#tabs");let cur=store.get("f26_tab",1);let tripDay=store.get("f26_trip",curDay);
 TABS.forEach((t,i)=>{const b=document.createElement("button");b.className="tab";b.setAttribute("role","tab");
  b.onclick=()=>{cur=i;store.set("f26_tab",i);render()};tabsEl.appendChild(b)});
 function paintTabs(){[...tabsEl.children].forEach((b,i)=>{
  b.classList.toggle("on",i===cur);b.setAttribute("aria-selected",i===cur);
  b.innerHTML=TABS[i]+(i===2&&picks.size?`<span class="n">${picks.size}</span>`:"")})}
 const C=$("#content");
-function render(){paintTabs();C.innerHTML="";[renderOverview,renderSchedule,renderAgenda,renderSpeakers][cur]()}
+function render(){paintTabs();C.innerHTML="";if(cur!==4)clearRoute();[renderOverview,renderSchedule,renderAgenda,renderSpeakers,renderTrip][cur]()}
 
 /* ================= SHARED PIECES ================= */
 const starSVG='<svg viewBox="0 0 20 20" fill="currentColor"><path d="M10 1.7l2.6 5.3 5.8.8-4.2 4.1 1 5.8L10 15l-5.2 2.7 1-5.8L1.6 7.8l5.8-.8z"/></svg>';
@@ -557,6 +605,7 @@ function renderAgenda(){
   <div class="atools">
    <button class="abtn hot" id="ics"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v8m0 0l-3-3m3 3l3-3M3 13.5h10"/></svg>Add to calendar (.ics)</button>
    <button class="abtn" id="alerts">${alertsOn?"🔔 Alerts on":"🔕 Enable leave-now alerts"}</button>
+   <button class="abtn" id="trip">🗺 See trip route</button>
   </div>`);
  if(!picks.size){C.insertAdjacentHTML("beforeend",`<div class="empty">Nothing selected yet.<br>Open <b>Schedule</b> and tap ★ on sessions.</div>`);}
  else DAYS.forEach(d=>{
@@ -571,6 +620,7 @@ function renderAgenda(){
     g.appendChild(evCard(e,{leave:lv}))});
    C.appendChild(g)})});
  $("#ics").onclick=exportICS;
+ $("#trip").onclick=()=>{cur=4;store.set("f26_tab",4);render()};
  $("#alerts").onclick=async()=>{
   if(!alertsOn){if("Notification"in window&&Notification.permission!=="granted")await Notification.requestPermission();
    alertsOn=true;toast("Alerts on while the app is open")}
@@ -588,6 +638,65 @@ function renderSpeakers(){
    <button class="meet${on?" on":""}" aria-pressed="${on}">${on?"MUST MEET ✓":"+ Meet"}</button>`;
   el.querySelector(".meet").onclick=()=>{on?meets.delete(i):meets.add(i);store.set("f26_meets",[...meets]);render()};
   C.appendChild(el)});}
+
+/* ================= TRIP ================= */
+function renderTrip(){
+ C.insertAdjacentHTML("beforeend",`<h2 class="sec">My <span class="grad">Trip</span></h2>
+  <p class="sub">Your starred day mapped as a walking route — where to go, in order, and when to leave. Set your base on the map for personal walk times & "leave by" alerts.</p>`);
+ const withPicks=DAYS.map((d,i)=>({i,n:d.ev.filter(e=>picks.has(e[0])).length})).filter(x=>x.n);
+ if(!withPicks.length){clearRoute();
+  C.insertAdjacentHTML("beforeend",`<div class="empty">No sessions selected yet.<br>Open <b>Schedule</b> and tap ★, then come back to see your route.</div>`);return;}
+ if(!withPicks.some(x=>x.i===tripDay))tripDay=withPicks[0].i;
+ const dp=document.createElement("div");dp.className="daypick";
+ withPicks.forEach(({i,n})=>{const d=DAYS[i];const b=document.createElement("button");b.className="dp"+(i===tripDay?" on":"");
+  b.innerHTML=`<div class="dw">${d.dw}</div><div class="dn">${d.dn}</div><div class="dw" style="color:var(--org)">${n}★</div>`;
+  b.onclick=()=>{tripDay=i;store.set("f26_trip",i);render()};dp.appendChild(b)});
+ C.appendChild(dp);
+ const day=DAYS[tripDay];
+ const sel=day.ev.filter(e=>picks.has(e[0])).slice().sort((a,b)=>a[1].localeCompare(b[1]));
+ /* group consecutive same-venue events into visits */
+ const visits=[];
+ sel.forEach(e=>{const v=VEN[e[4]];const last=visits[visits.length-1];
+  if(last&&last.v===v)last.events.push(e);else visits.push({v,events:[e]});});
+ drawRoute(visits);
+ C.insertAdjacentHTML("beforeend",`<button class="abtn" id="tripUp" style="margin:0 0 12px">🗺 Show route on map ↑</button>`);
+ /* build timeline + tallies */
+ let totalWalk=0,legs=0,prevV=null;
+ const rows=[];
+ visits.forEach((vt,idx)=>{const v=vt.v,firstStart=vt.events[0][1],mapped=v.lat!=null;
+  let leg="";
+  if(idx===0){
+   if(base&&mapped){const w=walk(v);if(w!=null){totalWalk+=w;legs++;
+    leg=`<div class="leg"><span class="legw">🚶 ${w} min from your 🏠 base</span><span class="legl">leave by ${shiftT(firstStart,-(w+5))}</span></div>`;}}
+   else leg=`<div class="leg same"><span class="legw">▶ Start of day</span></div>`;
+  }else{
+   const w=(prevV&&mapped)?walkBetween(prevV,v):null;
+   if(w!=null){totalWalk+=w;legs++;
+    leg=`<div class="leg"><span class="legw">🚶 ${w} min · ${prevV.s} → ${v.s}</span><span class="legl">leave by ${shiftT(firstStart,-(w+5))}</span></div>`;}
+   else leg=`<div class="leg same"><span class="legw">🚶 ${prevV?prevV.s+" → ":""}${v.s} · off-map</span></div>`;
+  }
+  /* tight-connection warning: previous visit's last end + walk overruns this start */
+  let warn="";
+  if(prevV){const prevEnd=visits[idx-1].events[visits[idx-1].events.length-1][2];const w=(mapped&&prevV.lat!=null)?walkBetween(prevV,v):0;
+   if(prevEnd&&toMin(prevEnd)+w>toMin(firstStart))warn=`<span class="tripwarn">⚠ tight connection</span>`;}
+  const evs=vt.events.map(e=>{const dur=e[2]?`${e[1]}–${e[2]}`:`${e[1]}`;
+   return`<div class="vev"><span class="vt">${dur}</span><span>${e[3]}${e[6]?` · <span class="vroom">${e[6]}</span>`:""}</span></div>`;}).join("");
+  rows.push(leg+`<div class="visit">
+    <span class="vnum" style="background:${v.hex};color:${v.dark?"#fff":"#04162E"}">${mapped?idx+1:"•"}</span>
+    <div class="vbd"><div class="vhead"><span class="vname">${v.n}</span>${warn}</div>${evs}</div>
+   </div>`);
+  prevV=v;});
+ const dayStart=sel[0][1],dayEnd=sel.reduce((m,e)=>{const t=e[2]||e[1];return toMin(t)>toMin(m)?t:m;},sel[0][2]||sel[0][1]);
+ C.insertAdjacentHTML("beforeend",`<div class="tripsum">
+   <span><b>${sel.length}</b> sessions</span>
+   <span><b>${visits.length}</b> stop${visits.length>1?"s":""}</span>
+   <span><b>${legs}</b> walk${legs===1?"":"s"}${base?` · <b>~${totalWalk}</b> min`:""}</span>
+   <span><b>${dayStart}</b>→<b>${dayEnd}</b></span>
+  </div>`);
+ C.insertAdjacentHTML("beforeend",`<div class="trip">${rows.join("")}</div>`);
+ if(!base)C.insertAdjacentHTML("beforeend",`<p class="sub" style="margin-top:10px;color:#FFD9A8">Tip: drag the map & tap <b>“Set my base here”</b> to get walk minutes and “leave by” times.</p>`);
+ $("#tripUp").onclick=()=>window.scrollTo({top:0,behavior:"smooth"});
+}
 
 /* ================= ICS ================= */
 function exportICS(){
