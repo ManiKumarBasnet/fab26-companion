@@ -1,0 +1,615 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>FAB26 Boston · SuperFabLab Companion</title>
+<meta name="description" content="FAB26 Boston attendee companion — map, time-grid schedule, personal agenda with leave-now alerts, speakers to meet. Built by SuperFabLab Bhutan.">
+<meta name="theme-color" content="#002855">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Manrope:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+:root{
+  --navy:#002855; --bg:#04162E; --panel:#0B2547; --panel-2:#10305C;
+  --line:rgba(140,180,230,.16); --line-2:rgba(140,180,230,.32);
+  --txt:#EAF2FC; --txt-2:#9FB6D4; --txt-3:#6883A6;
+  --org:#FF6B35; --cyn:#25C9FF; --mag:#FF3D8A; --lim:#A6E22E; --yel:#FFC24B; --grn:#19C99A; --pur:#8B7BFF;
+  --k:#8B7BFF; --e15:#19C99A; --e14:#FF6B35; --mus:#FF3D8A; --fhk:#FFC24B; --off:#7E93AE;
+  --r:14px; --sh:0 10px 30px rgba(0,10,30,.45);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{-webkit-text-size-adjust:100%}
+body{font-family:Manrope,system-ui,sans-serif;background:var(--bg);color:var(--txt);font-size:15px;line-height:1.5;
+  background-image:radial-gradient(1100px 480px at 85% -10%,rgba(37,201,255,.10),transparent),radial-gradient(900px 480px at -10% 30%,rgba(255,107,53,.08),transparent)}
+button{font:inherit;cursor:pointer;color:inherit;background:none;border:0}
+a{color:inherit;text-decoration:none}
+:focus-visible{outline:2px solid var(--cyn);outline-offset:2px;border-radius:4px}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+.disp{font-family:Sora,sans-serif}
+
+/* ===== HEADER ===== */
+header{position:sticky;top:0;z-index:1000;background:linear-gradient(180deg,var(--navy),#00224A);border-bottom:1px solid var(--line)}
+header .in{max-width:780px;margin:0 auto;padding:10px 14px;display:flex;align-items:center;gap:10px}
+.logo{font-family:Sora,sans-serif;font-weight:800;font-size:20px;letter-spacing:-.02em;display:flex;align-items:baseline}
+.logo b{color:#fff}.logo i{font-style:normal;background:linear-gradient(90deg,var(--org),var(--mag),var(--cyn));-webkit-background-clip:text;background-clip:text;color:transparent}
+.logo small{font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--txt-3);margin-left:8px;letter-spacing:.18em}
+.teamchip{margin-left:auto;display:flex;align-items:center;gap:7px;background:rgba(37,201,255,.10);border:1px solid rgba(37,201,255,.35);border-radius:999px;padding:5px 11px;font-size:11.5px;font-weight:700;color:#BFE9FF;white-space:nowrap}
+.teamchip .dotb{width:7px;height:7px;border-radius:50%;background:linear-gradient(135deg,var(--yel),var(--org))}
+
+/* ===== MAP ===== */
+#mapwrap{position:relative;height:min(42vh,400px);border-bottom:1px solid var(--line)}
+#map{position:absolute;inset:0}
+.leaflet-container{background:#DFE7F0;font:inherit}
+.vtip{background:#fff;border:0;border-radius:6px;box-shadow:0 2px 8px rgba(0,20,50,.35);color:#0B2547;font:800 10.5px/1.2 Manrope,sans-serif;padding:3px 7px;white-space:nowrap}
+.vtip::before{display:none}
+.mapbar{position:absolute;left:10px;right:10px;bottom:10px;z-index:900;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.mapbtn{display:inline-flex;align-items:center;gap:7px;background:var(--navy);color:#fff;border:1px solid var(--line-2);border-radius:999px;padding:9px 15px;font-size:13px;font-weight:800;box-shadow:var(--sh)}
+.mapbtn.accent{background:linear-gradient(90deg,var(--org),#FF8A3D);border:0}
+.mapbtn svg{width:14px;height:14px}
+#basePill{background:rgba(255,255,255,.94);color:var(--navy);border:0;font-weight:800;max-width:60%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:none}
+#geoNote{width:100%;font-size:11.5px;color:#FFD9A8;text-shadow:0 1px 2px rgba(0,0,0,.5)}
+.crossp{position:absolute;left:50%;top:50%;transform:translate(-50%,-100%);z-index:800;pointer-events:none;filter:drop-shadow(0 3px 4px rgba(0,0,0,.45))}
+
+/* ===== TABS ===== */
+.tabs{position:sticky;top:49px;z-index:990;background:rgba(4,22,46,.94);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+.tabs .in{max-width:780px;margin:0 auto;display:flex;gap:4px;padding:8px 12px;overflow-x:auto}
+.tab{flex:none;padding:8px 15px;border-radius:999px;font-size:13px;font-weight:800;color:var(--txt-2);border:1px solid transparent;white-space:nowrap}
+.tab.on{color:#fff;background:var(--panel-2);border-color:var(--line-2)}
+.tab .n{display:inline-grid;place-items:center;min-width:17px;height:17px;padding:0 4px;border-radius:999px;background:var(--org);color:#fff;font-size:10.5px;margin-left:5px}
+main{max-width:780px;margin:0 auto;padding:18px 14px 80px}
+h2.sec{font-family:Sora,sans-serif;font-weight:800;font-size:21px;letter-spacing:-.01em;margin:6px 0 3px}
+p.sub{font-size:13px;color:var(--txt-2);margin:0 0 14px}
+.grad{background:linear-gradient(90deg,var(--cyn),var(--lim));-webkit-background-clip:text;background-clip:text;color:transparent}
+
+/* ===== DAY PICKER ===== */
+.daypick{display:flex;gap:6px;overflow-x:auto;margin:0 0 18px;padding-bottom:2px}
+.dp{flex:none;text-align:center;border:1px solid var(--line);background:var(--panel);border-radius:12px;padding:7px 13px;min-width:64px}
+.dp .dw{font-size:11px;font-weight:800;color:var(--txt-2)}
+.dp .dn{font-family:Sora,sans-serif;font-weight:800;font-size:17px;line-height:1.1}
+.dp.on{background:linear-gradient(135deg,var(--panel-2),#153A6E);border-color:var(--cyn);box-shadow:0 0 0 1px rgba(37,201,255,.3)}
+.dp.on .dw{color:var(--cyn)}
+
+/* ===== TIME SLOTS ===== */
+.slot{display:flex;align-items:center;gap:12px;margin:22px 0 10px}
+.tbig{font-family:'IBM Plex Mono',monospace;font-weight:600;font-size:19px;letter-spacing:-.02em;color:#04162E;background:linear-gradient(135deg,var(--lim),#7ED957);border-radius:10px;padding:5px 12px;box-shadow:0 4px 14px rgba(166,226,46,.25)}
+.slot.evening .tbig{background:linear-gradient(135deg,var(--mag),#FF6FA5);color:#fff;box-shadow:0 4px 14px rgba(255,61,138,.3)}
+.tline{flex:1;height:1px;background:linear-gradient(90deg,var(--line-2),transparent)}
+.tpar{font-size:11px;font-weight:800;color:var(--txt-3);letter-spacing:.08em;text-transform:uppercase}
+.slotgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:9px}
+
+/* ===== EVENT CARDS ===== */
+.ev{position:relative;display:flex;flex-direction:column;gap:8px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:11px 12px 10px;transition:all .15s}
+.ev.sel{background:var(--panel-2);border-color:rgba(255,107,53,.55);box-shadow:0 0 0 1px rgba(255,107,53,.3)}
+.ev .toprow{display:flex;align-items:flex-start;gap:8px}
+.vbox{flex:none;display:inline-flex;align-items:center;gap:6px;background:var(--vc);color:#04162E;font-weight:800;font-size:11px;border-radius:7px;padding:4px 9px;letter-spacing:.02em}
+.vbox.dark{color:#fff}
+.vbox .wm{font-family:'IBM Plex Mono',monospace;font-weight:600;font-size:10px;opacity:.85;border-left:1.5px solid rgba(0,0,0,.25);padding-left:6px}
+.vbox.dark .wm{border-color:rgba(255,255,255,.35)}
+.ev .nm{font-size:13.5px;font-weight:700;line-height:1.3}
+.ev .botrow{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.kind{font-size:10px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;border-radius:5px;padding:2.5px 8px}
+.kind.keynote{background:linear-gradient(90deg,var(--mag),var(--org));color:#fff}
+.kind.workshop{border:1.5px dashed var(--cyn);color:var(--cyn)}
+.kind.talks{border:1.5px solid var(--pur);color:#B9AFFF}
+.kind.food{background:var(--yel);color:#3A2600}
+.kind.social{background:linear-gradient(90deg,var(--pur),var(--cyn));color:#fff}
+.kind.kids{border:1.5px solid var(--mag);color:#FF9BC4;border-radius:999px}
+.kind.info{background:rgba(126,147,174,.25);color:var(--txt-2)}
+.kind.business{background:var(--grn);color:#04261C}
+.badge{font-size:9.5px;font-weight:800;letter-spacing:.05em;background:linear-gradient(90deg,var(--org),var(--mag));color:#fff;border-radius:4px;padding:2px 6px}
+.ev .acts{position:absolute;top:9px;right:9px;display:flex;gap:5px}
+.star{width:30px;height:30px;border-radius:9px;display:grid;place-items:center;border:1px solid var(--line);background:var(--panel-2);color:var(--txt-3);transition:all .15s}
+.star.on{background:linear-gradient(135deg,var(--org),#FF9046);border-color:transparent;color:#fff}
+.star svg{width:14px;height:14px}
+.golink{width:30px;height:30px;border-radius:9px;display:grid;place-items:center;border:1px solid var(--line);background:var(--panel-2);color:var(--txt-2)}
+.golink svg{width:12px;height:12px}
+.leave{font-family:'IBM Plex Mono',monospace;font-size:11px;color:var(--lim);font-weight:600}
+
+/* ===== OVERVIEW DASHBOARD ===== */
+.statrow{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px}
+.stat{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:13px 14px;text-align:center}
+.stat b{display:block;font-family:Sora,sans-serif;font-weight:800;font-size:26px;background:linear-gradient(90deg,var(--cyn),var(--lim));-webkit-background-clip:text;background-clip:text;color:transparent}
+.stat span{font-size:11px;font-weight:700;color:var(--txt-2);letter-spacing:.05em;text-transform:uppercase}
+.panelbox{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:15px 16px;margin-bottom:14px}
+.panelbox h3{font-family:Sora,sans-serif;font-weight:700;font-size:13.5px;margin-bottom:11px;display:flex;align-items:center;gap:8px}
+.vload{display:flex;flex-direction:column;gap:8px}
+.vl{display:grid;grid-template-columns:96px 1fr 30px;align-items:center;gap:9px;font-size:12px}
+.vl .lbl{font-weight:800}
+.vl .bar{height:14px;border-radius:6px;background:var(--panel-2);overflow:hidden}
+.vl .bar i{display:block;height:100%;border-radius:6px;background:var(--vc)}
+.vl .ct{font-family:'IBM Plex Mono',monospace;color:var(--txt-2);text-align:right}
+.kmix{display:flex;gap:7px;flex-wrap:wrap}
+.kmix .kind{font-size:10.5px;padding:5px 11px}
+.kmix .kind em{font-style:normal;font-family:'IBM Plex Mono',monospace;opacity:.85;margin-left:5px}
+.daystrip{display:flex;flex-direction:column;gap:9px}
+.ds{display:grid;grid-template-columns:64px 1fr auto;align-items:center;gap:10px;font-size:12px;border:1px solid var(--line);border-radius:10px;padding:8px 11px;background:var(--panel-2)}
+.ds .dl{font-weight:800}
+.ds .dots{display:flex;gap:4px;flex-wrap:wrap}
+.ds .dots i{width:11px;height:11px;border-radius:3.5px;background:var(--vc)}
+.ds .tm{font-family:'IBM Plex Mono',monospace;color:var(--txt-2);white-space:nowrap}
+
+/* ===== PRIORITY / SPEAKERS / AGENDA ===== */
+.prio{position:relative;overflow:hidden;background:linear-gradient(135deg,#0C2A52,#123A6E);border:1px solid rgba(37,201,255,.35);border-radius:var(--r);padding:15px 16px 13px;margin-bottom:16px}
+.prio .kick{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.2em;color:var(--cyn);text-transform:uppercase}
+.prio h3{font-family:Sora,sans-serif;font-weight:800;font-size:16px;margin:3px 0 8px}
+.prio ul{list-style:none;display:flex;flex-direction:column;gap:6px;font-size:12.5px}
+.prio li{display:flex;gap:9px}
+.prio li b{color:var(--yel);font-family:'IBM Plex Mono',monospace;font-weight:600;font-size:11px;flex:none;width:76px;padding-top:1px}
+.atools{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 14px}
+.abtn{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line-2);background:var(--panel);border-radius:10px;padding:9px 14px;font-size:13px;font-weight:800}
+.abtn.hot{background:linear-gradient(90deg,var(--grn),#14A67F);border:0;color:#04261C}
+.abtn svg{width:14px;height:14px}
+.empty{border:1.5px dashed var(--line-2);border-radius:var(--r);padding:26px 18px;text-align:center;color:var(--txt-2);font-size:13.5px}
+.sp{display:flex;gap:12px;align-items:center;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:11px 13px;margin-bottom:8px}
+.sp.on{border-color:rgba(255,194,75,.6);background:var(--panel-2)}
+.av{flex:none;width:42px;height:42px;border-radius:12px;display:grid;place-items:center;font-family:Sora,sans-serif;font-weight:800;font-size:14px;color:#fff;background:linear-gradient(135deg,var(--a1),var(--a2))}
+.sp .bd{flex:1;min-width:0}
+.sp .nm{font-weight:800;font-size:14px}
+.sp .rl{font-size:12px;color:var(--txt-2)}
+.sp .wh{font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:var(--txt-3);margin-top:1px}
+.meet{flex:none;border:1px solid var(--line-2);border-radius:999px;padding:6px 13px;font-size:12px;font-weight:800;color:var(--txt-2)}
+.meet.on{background:linear-gradient(90deg,var(--yel),var(--org));border:0;color:#3A1D00}
+#toast{position:fixed;left:50%;bottom:18px;transform:translateX(-50%) translateY(80px);background:#fff;color:var(--navy);font-weight:800;font-size:13px;border-radius:999px;padding:11px 18px;box-shadow:var(--sh);transition:transform .25s;z-index:2000;max-width:92vw;text-align:center}
+#toast.on{transform:translateX(-50%) translateY(0)}
+footer{max-width:780px;margin:0 auto;padding:0 14px 26px;font-size:11.5px;color:var(--txt-3);display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap}
+footer b{color:var(--txt-2)}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="in">
+    <span class="logo"><b>FAB</b><i>26</i><small>BOSTON · JUL 27–31</small></span>
+    <span class="teamchip"><span class="dotb"></span>SuperFabLab Bhutan · ×3</span>
+  </div>
+</header>
+
+<div id="mapwrap">
+  <div id="map" role="application" aria-label="Cambridge map. Drag to place the pin on your accommodation."></div>
+  <svg class="crossp" id="cross" width="32" height="44" viewBox="0 0 30 42" aria-hidden="true">
+    <path d="M15 0C6.7 0 0 6.7 0 15c0 10 15 27 15 27s15-17 15-27C30 6.7 23.3 0 15 0z" fill="#FF6B35"/>
+    <circle cx="15" cy="15" r="5.5" fill="#fff"/>
+  </svg>
+  <div class="mapbar">
+    <button class="mapbtn accent" id="setBase">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 8.5l3.5 3.5 7.5-8"/></svg>
+      Set my base here
+    </button>
+    <button class="mapbtn" id="geo">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="8" cy="8" r="5.2"/><circle cx="8" cy="8" r="1.6" fill="currentColor" stroke="none"/><path d="M8 .8v2M8 13.2v2M.8 8h2M13.2 8h2" stroke-linecap="round"/></svg>
+      GPS
+    </button>
+    <button class="mapbtn" id="basePill" title="Tap to change base"></button>
+    <span id="geoNote" role="status"></span>
+  </div>
+</div>
+
+<nav class="tabs"><div class="in" id="tabs" role="tablist"></div></nav>
+<main id="content"></main>
+
+<footer>
+  <span>Built by <b>SuperFabLab Bhutan</b> · Voxel Robotic Construction × MIT CBA</span>
+  <a href="https://fab26.fabevent.org/programs/schedule" target="_blank" rel="noopener" style="color:var(--txt-3)">Official schedule ↗</a>
+</footer>
+<div id="toast" role="status"></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+"use strict";
+/* ================= DATA ================= */
+const VEN={
+ K:{n:"Kresge Auditorium",s:"KRESGE",ad:"48 Massachusetts Ave, Cambridge MA",lat:42.35818,lng:-71.09449,hex:"#8B7BFF",dark:1},
+ E15:{n:"E15 · CBA Fab Lab",s:"E15 CBA",ad:"20 Ames St, Cambridge MA",lat:42.36049,lng:-71.08749,hex:"#19C99A",dark:0},
+ E14:{n:"E14 · MIT Media Lab",s:"MEDIA LAB",ad:"75 Amherst St, Cambridge MA",lat:42.36030,lng:-71.08730,hex:"#FF6B35",dark:1},
+ M:{n:"MIT Museum",s:"MUSEUM",ad:"314 Main St, Cambridge MA",lat:42.36225,lng:-71.08404,hex:"#FF3D8A",dark:1},
+ F:{n:"Fab Hub Kendall",s:"FAB HUB",ad:"325 Main St, Cambridge MA",lat:42.36250,lng:-71.08570,hex:"#FFC24B",dark:0},
+ O:{n:"Off-site",s:"OFF-SITE",ad:"Cambridge MA",lat:null,lng:null,hex:"#7E93AE",dark:1}};
+const KINDS={keynote:"Keynote",workshop:"Workshop",talks:"Talks",food:"Food",social:"Social",kids:"Kids Lab",info:"Info",business:"Business"};
+/* id, HH:MM, title, venue, kind, room, must */
+const DAYS=[
+ {dw:"Mon",dn:"27",t:"Inauguration",date:"2026-07-27",ev:[
+  ["m01","07:30","Registration opens","K","info","G-Entrance Hall"],
+  ["m02","08:30","WG · Care: Health Through Fab Communities","K","talks","LL-033"],
+  ["m03","08:30","WG · Fab Lab Asia Network (FAN)","K","talks","LL-030"],
+  ["m04","09:30","FAB26 Inauguration — Gershenfeld · Kornbluth · Lassiter","K","keynote","G-Auditorium",1],
+  ["m05","09:57","FAB28 Pitches","K","talks","G-Auditorium"],
+  ["m06","10:07","Musical Performance","K","talks","G-Auditorium"],
+  ["m07","10:17","Designing Reality: Audiobook","K","talks","G-Auditorium"],
+  ["m08","10:32","Fab Furniture — Digital Craft to Global Scale","K","keynote","G-Auditorium"],
+  ["m09","10:45","Break","K","food","G-Entrance Hall"],
+  ["m10","11:15","CBA Legacy — Cheung · Peek · Moyer · Maguire","K","keynote","G-Auditorium",1],
+  ["m11","11:45","Science & Entertainment Exchange — the Zuckers","K","keynote","G-Auditorium"],
+  ["m12","11:55","Interspecies Internet","K","keynote","G-Auditorium"],
+  ["m13","12:05","NAE — Recognizing Unseen Engineers","K","keynote","G-Auditorium"],
+  ["m14","12:15","Engineering Art — Echelman · Bathgate · Parra Rubio","K","keynote","G-Auditorium"],
+  ["m15","12:45","Making Almost Anything — Neil Gershenfeld","K","keynote","G-Auditorium",1],
+  ["m16","13:00","Lunch","E14","food","6-Lunch"],
+  ["m17","14:00","Kids Lab · Physical VR Creature","M","kids","3-Learning Lab-1"],
+  ["m18","14:30","Fab Vine Voxel Assembly — Day 1 · Abdel-Rahman (CBA)","F","workshop","2-Event Space",1],
+  ["m19","14:30","Build a Low-Cost CNC Art Machine","F","workshop","2-Working Space"],
+  ["m20","14:30","Agri-Waste → Bio-Based Materials","F","workshop","2-TextileLab-1"],
+  ["m21","14:30","Quick & FABulous Projects for New Makers","F","workshop","2-TextileLab-2"],
+  ["m22","14:30","Makey Makey: Low-Cost Future Literacy","F","workshop","2-ColabLab"],
+  ["m23","14:30","3D-Printed Soap Molds","F","workshop","2-Electronic Lab"],
+  ["m24","14:30","Brother PR1060W & PS300 Demos","F","info","2-Event Space"],
+  ["m25","14:30","Fab Quest: A Game Inspired by Fab Academy","E15","workshop","3-359"],
+  ["m26","14:30","Mobile Fab Labs: Looking Back, Moving Forward","E14","workshop","3-393"],
+  ["m27","14:30","Making with Equity","E14","workshop","2-244"],
+  ["m28","14:30","Custom Stanley Cups Studio (xTool)","E14","workshop","G-HotWork"],
+  ["m29","14:30","Documenting While Doing","E14","workshop","5-514B"],
+  ["m30","14:30","Disclosing AI in Education, Honestly","E14","workshop","4-493"],
+  ["m31","14:30","Xoco-Futures: Biocultural Resiliency","E14","workshop","G-Machine Shop-2"],
+  ["m32","14:30","Fabcare × Physical AI","E14","workshop","G-Shop-2"],
+  ["m33","14:30","Open Hardware in China's K-12 Classes","E14","workshop","2-240"],
+  ["m34","14:30","Engineering with Paper","M","workshop","3-Maker Hub"],
+  ["m35","15:20","Exchange Short Talks ×6 — STEM · circularity · biomaterials","M","talks","2-The Exchange"],
+  ["m36","16:00","Fab Access for Blind & Low-Vision Communities","E14","workshop","3-393"],
+  ["m37","16:30","TapeBlocks: Inclusive Electronics","F","workshop","2-ColabLab"],
+  ["m38","16:30","4th-Axis 3D Carving on ShopBot CNC","F","workshop","2-Electronic Lab"],
+  ["m39","16:30","AI Art & MetalFab: Laser-Welded Lamp","E14","workshop","G-HotWork"],
+  ["m40","17:00","FabStorm: Card Game for DigFab","F","workshop","2-Conference Room"],
+  ["m41","17:10","Short Talks ×3 — Galicia node · breathing games · distributed mfg","E14","talks","6-633"],
+  ["m42","19:00","Inauguration Reception — top of the PRU","O","social","Evening"]]},
+ {dw:"Tue",dn:"28",t:"Tools & Tech",date:"2026-07-28",ev:[
+  ["t01","08:00","Registration","K","info","G-Entrance Hall"],
+  ["t02","08:30","WG · Fab Learning Academy","K","talks","LL-033"],
+  ["t03","08:30","WG · Fabricademy Textile & Tech","K","talks","LL-030"],
+  ["t04","09:30","Welcome & Announcements","K","talks","G-Auditorium"],
+  ["t05","09:35","Fab Blasts ×4 — Kenyan bio-seat · AI→bronze · Fab Junk · robotic craft","K","talks","G-Auditorium"],
+  ["t06","10:10","Prototyping → Distributed Production (xTool)","K","keynote","G-Auditorium"],
+  ["t07","10:30","Break","K","food","G-Entrance Hall"],
+  ["t08","11:00","Future of Robotics — Raibert · Pratt · Smith","K","keynote","G-Auditorium",1],
+  ["t09","11:30","Future of 3D Printing — Průša · Lobovsky · Read","K","keynote","G-Auditorium"],
+  ["t10","12:00","Future of AI — Vigoda · Bahai · Blackburn","K","keynote","G-Auditorium"],
+  ["t11","12:30","Future of Life — Adamala · Glass · Strychalski","K","keynote","G-Auditorium"],
+  ["t12","13:00","Lunch · Intl. Sweets & Snacks Exchange — Day 1","E14","food","6-Lunch"],
+  ["t13","14:00","Kids Lab · Robotic McQueen","M","kids","3-Learning Lab-2"],
+  ["t14","14:30","Fab Vine Voxel Assembly — Day 2 · CBA team","F","workshop","2-Event Space",1],
+  ["t15","14:30","Scalable Structural Robotic Assembly — Miana Smith (CBA)","E14","talks","6-633",1],
+  ["t16","14:30","Build Your Own Machine: Motion Systems — Bolsée","E14","workshop","G-Shop-1",1],
+  ["t17","14:30","Rethinking CNC Access with AI","E14","workshop","G-Machine Shop-1"],
+  ["t18","14:30","Making Is Easy. Documenting Is Hard.","E14","workshop","2-244"],
+  ["t19","14:30","UNIHIKER K10: Code for AI","F","workshop","2-TextileLab-2"],
+  ["t20","14:30","Friction First: Critical Thinking in the AI Age","E15","workshop","3-359"],
+  ["t21","14:30","WG · Industrial Innovation & Robotics","E14","talks","5-514B"],
+  ["t22","14:30","WG · STEAM/Maker Educators vs AI","F","talks","2-Conference Room"],
+  ["t23","14:30","Standardized Part Numbering for Makers","E14","workshop","3-393"],
+  ["t24","14:30","TurtleStitch: Code & Stitch Embroidery","F","workshop","2-ColabLab"],
+  ["t25","14:30","Cutting with Code","F","workshop","2-TextileLab-1"],
+  ["t26","14:30","SafeStep: Fall Detection for Seniors","E14","workshop","G-Shop-2"],
+  ["t27","14:30","WG · Biofabrication","E14","talks","2-240"],
+  ["t28","14:30","ShopBot CNC Tune-Up — Day 1","E14","workshop","G-Machine Shop-2"],
+  ["t29","14:30","Brother Demos — Day 2","F","info","2-Event Space"],
+  ["t30","14:30","Meshtastic: Off-Grid IoT Networks — Seeed × Fab City","F","workshop","2-Working Space"],
+  ["t31","14:30","Democratised, Distributed Manufacturing","E14","workshop","4-493"],
+  ["t32","14:30","Print-a-Bite: Gummy Engineering","F","workshop","2-Electronic Lab"],
+  ["t33","15:30","Exchange Short Talks ×6 — Brazil curriculum · Urumi · food design","M","talks","2-The Exchange"],
+  ["t34","16:00","Dignity Compass with Fab Foundation","E14","workshop","2-244"],
+  ["t35","16:00","Maker Literacies Across the Curriculum","E14","workshop","3-393"],
+  ["t36","16:30","Vibe Hardware: Open Lab with Tiles","F","workshop","2-ColabLab"],
+  ["t37","16:30","KiCad → CNC PCB Fabrication","E14","workshop","G-Machine Shop-2"],
+  ["t38","16:30","Building & Programming Cablebots","E14","workshop","G-Shop-2"],
+  ["t39","16:30","All Fun & Games with DigFab","F","workshop","2-TextileLab-1"],
+  ["t40","16:30","Streetwear Lab: T-Shirt & Sneaker (xTool)","F","workshop","2-Electronic Lab"],
+  ["t41","16:30","Research Papers — Day 1 · Troxler","E14","talks","2-240"],
+  ["t42","16:30","Reticulum & Nomadnet Mesh Networks","F","workshop","2-Conference Room"],
+  ["t43","17:00","Education Short Talks ×5 — Japan STEAM · 3D print for blind students","E14","talks","6-633"]]},
+ {dw:"Wed",dn:"29",t:"Education",date:"2026-07-29",ev:[
+  ["w01","08:30","Registration & Info Point","K","info","G-Entrance Hall"],
+  ["w02","08:30","WG · Academany — with Gershenfeld","K","talks","LL-Little Theater",1],
+  ["w03","09:30","Welcome & Fab Blasts — girls in STEM · lifelong learning · AI agents","K","talks","G-Auditorium"],
+  ["w04","10:05","Origins: Constructionism & Seymour Papert","K","talks","G-Auditorium"],
+  ["w05","10:35","Break","K","food","G-Entrance Hall"],
+  ["w06","11:00","Interlude: Origins to Futures — Bertsimas","K","keynote","G-Auditorium"],
+  ["w07","11:10","Regenerative Futures Youth Awards","K","talks","G-Auditorium"],
+  ["w08","11:20","Making with LEGO","K","talks","G-Auditorium"],
+  ["w09","11:30","Panel: Innovative Education for the Future","K","talks","G-Auditorium"],
+  ["w10","12:15","Strategic Impact — Investing in Innovators","K","keynote","G-Auditorium"],
+  ["w11","12:35","Panel: Scaling Fab Education","K","talks","G-Auditorium"],
+  ["w12","13:00","Lunch · Sweets Exchange — Day 2","E14","food","6-Lunch"],
+  ["w13","14:00","Kids Lab · Zero Gravity Butterfly","M","kids","3-Learning Lab-1"],
+  ["w14","14:30","Robotic Craft in the CBA Shops — Dubor","E15","workshop","LL-CBA Shops & Labs",1],
+  ["w15","14:30","Fab Vine Voxel Assembly — Day 3 · CBA team","F","workshop","2-Event Space",1],
+  ["w16","14:30","Single Iterative Project Curriculum","E14","talks","2-244"],
+  ["w17","14:30","Traditional Looms × Digital Manufacturing","F","workshop","2-TextileLab-2"],
+  ["w18","14:30","The Perceptron: Hands-On Deep Learning","F","workshop","2-ColabLab"],
+  ["w19","14:30","Become an Electrical Wizard","F","workshop","2-Electronic Lab"],
+  ["w20","14:30","School-Embedded Fab Labs","E14","workshop","G-Printing Lab"],
+  ["w21","14:30","Sew:bit — micro:bit E-Textiles","F","workshop","2-Working Space"],
+  ["w22","14:30","Vibrations in CNC Milling","E14","workshop","G-Machine Shop-1"],
+  ["w23","14:30","Maker Finance: When an Investor Likes You","E14","workshop","3-393"],
+  ["w24","14:30","Fiber Laser PCB Fab","E14","workshop","G-Shop-2"],
+  ["w25","14:30","Disaster Risk Reduction Game","E15","workshop","3-341"],
+  ["w26","14:30","Distributed Quality Management","E15","workshop","3-359"],
+  ["w27","14:30","WG · Responsible Rapid Prototypers","F","talks","2-Conference Room"],
+  ["w28","14:30","SimulIDE Hardware Control","E14","workshop","5-514B"],
+  ["w29","14:30","Quadrant Analysis for STEM Lessons","E14","workshop","4-493"],
+  ["w30","14:30","Stitching STEAM: Glow Plushie → Parachute","F","workshop","2-TextileLab-1"],
+  ["w31","14:30","WG · Starting a STEAM Community","E14","talks","2-240"],
+  ["w32","14:30","ShopBot Tune-Up — Day 2","E14","workshop","G-Machine Shop-2"],
+  ["w33","14:30","Brother Demos — Day 3","F","info","2-Event Space"],
+  ["w34","14:30","Hands-On Biomaterials Making","E14","workshop","G-Shop-1"],
+  ["w35","15:30","Recycled Plastic → Educational Puzzles","F","workshop","2-ColabLab"],
+  ["w36","15:30","Exchange Short Talks ×7 — nuclear sub · Kenya · maker cities","M","talks","2-The Exchange"],
+  ["w37","16:00","Design Thinking in Any Classroom","E14","workshop","5-514B"],
+  ["w38","16:30","Design & Destroy: 3D-Printed Bridges","E14","workshop","G-Printing Lab"],
+  ["w39","16:30","Research Papers — Day 2","E14","talks","2-240"],
+  ["w40","16:30","EDC Upgrade & Hardcore Mod (xTool)","F","workshop","2-TextileLab-2"],
+  ["w41","17:00","Short Talks ×6 — heritage 3D · maker investment · India makerspaces","E14","talks","6-633"],
+  ["w42","17:30","Visualizing Physics: Open Hardware","F","workshop","2-ColabLab"],
+  ["w43","18:30","Academany Graduation — 25-Year Special","K","social","G-Auditorium"],
+  ["w44","20:00","Academany Reception","M","social","G-Museum Lobby"]]},
+ {dw:"Thu",dn:"30",t:"Fab City",date:"2026-07-30",ev:[
+  ["h01","08:30","WG · Fab Labs & UN SDGs","K","talks","LL-033"],
+  ["h02","08:30","WG · Humanitarian","K","talks","LL-030"],
+  ["h03","08:30","Kendall Networking Cafe — KSA","O","social","Kendall Sq"],
+  ["h04","09:00","Registration & Info Point","K","info","G-Entrance Hall"],
+  ["h05","09:30","The Freedom to Make: Fab City, Rewired — Diez","K","talks","G-Auditorium"],
+  ["h06","09:45","Fab City Awards Roundtable","K","talks","G-Auditorium"],
+  ["h07","10:30","Break","K","food","G-Entrance Hall"],
+  ["h08","11:00","The Science of Making Cities — Gershenfeld · Larson","K","keynote","G-Auditorium",1],
+  ["h09","11:30","Fab City Pledge","K","talks","G-Auditorium"],
+  ["h10","12:00","HyTech Update + Ancient Intelligence Panel","K","talks","G-Auditorium"],
+  ["h11","12:30","Bioregional Operating Systems Panel","K","talks","G-Auditorium"],
+  ["h12","13:00","Lunch","E14","food","6-Lunch"],
+  ["h13","14:00","Kids Lab · Soft Space Aliens","M","kids","3-Learning Lab-2"],
+  ["h14","14:30","Designing Machines That Make — MTM Philosophy","E15","workshop","3-359",1],
+  ["h15","14:30","DIY Pinball Part I","F","workshop","2-Electronic Lab"],
+  ["h16","14:30","Mono Print with Biomaterials","F","workshop","2-Conference Room"],
+  ["h17","14:30","Living Lab in Action & Zine Making","E14","workshop","G-Shop-1"],
+  ["h18","14:30","Ceramic Coaster Design (xTool)","F","workshop","2-Event Space"],
+  ["h19","14:30","Research Papers — Day 3","E14","talks","2-240"],
+  ["h20","14:30","WG · Fab Lab TV: Your Lab, Your Channel","E14","talks","5-514B"],
+  ["h21","14:30","3D Printing for Beginner Teachers","F","workshop","2-TextileLab-2"],
+  ["h22","14:30","E-Textiles with the FabriXIAO","F","workshop","2-TextileLab-1"],
+  ["h23","14:30","Woody: Sawdust + Starch Bio-Composite","F","workshop","2-ColabLab"],
+  ["h24","14:30","3D-Printed Tooling for Leathercraft","E14","workshop","G-Printing Lab"],
+  ["h25","14:30","Your Lab as an Observatory — Fab City Data","E14","workshop","2-244"],
+  ["h26","14:30","Fab City Collective Workshop","E14","workshop","4-493"],
+  ["h27","14:30","Seeed Codecraft: AI Coding for Hardware","F","workshop","2-Working Space"],
+  ["h28","14:30","RE-trazo: Circular-Economy Furniture","E14","workshop","G-Machine Shop-1"],
+  ["h29","14:30","Fab Policy in Theory & Practice","E15","workshop","3-341"],
+  ["h30","14:30","Designing Learning Experiences","E14","workshop","3-393"],
+  ["h31","15:30","Exchange Short Talks ×5 — urban greenery · biomaterials · Makerspaces Africa","M","talks","2-The Exchange"],
+  ["h32","15:30","Produce: Fabricating the Future","E14","workshop","2-244"],
+  ["h33","15:35","Physical Foundations for the Future of AI — Gershenfeld (remote)","E14","talks","6-633",1],
+  ["h34","21:00","Stars Party","O","social","Evening"]]},
+ {dw:"Fri",dn:"31",t:"Closing",date:"2026-07-31",ev:[
+  ["f01","09:30","Closing Sessions — lineup being announced by FAB26","K","keynote","G-Auditorium"],
+  ["f02","13:00","Lunch","E14","food","6-Lunch"],
+  ["f03","14:30","Final Workshops — rooms TBA on official schedule","E14","workshop","TBA"],
+  ["f04","16:30","Closing at the Hub","F","social","2nd Floor"],
+  ["f05","18:00","Business Meeting — SuperFabLab Bhutan × MIT CBA","E15","business","Confirm room",1]]}];
+const SPK=[
+ ["Neil Gershenfeld","Director, MIT Center for Bits & Atoms","Mon 09:30 & 12:45 Kresge · Thu 11:00 & 15:35","NG","#25C9FF","#8B7BFF"],
+ ["Amira Abdel-Rahman","MIT CBA — voxel robotic assembly","Fab Vine Voxel Assembly · Mon–Wed 14:30 · Fab Hub","AA","#19C99A","#25C9FF"],
+ ["Miana Smith","MIT CBA — structural robotic assembly","Scalable Robotic Assembly · Tue 14:30 · E14 6-633","MS","#A6E22E","#19C99A"],
+ ["Sally Kornbluth","President, MIT","Inauguration · Mon 09:30 · Kresge","SK","#FF3D8A","#FF6B35"],
+ ["Marc Raibert","Founder, Boston Dynamics","Future of Robotics · Tue 11:00 · Kresge","MR","#FFC24B","#FF6B35"],
+ ["Josef Průša","Founder, Prusa Research","Future of 3D Printing · Tue 11:30 · Kresge","JP","#FF6B35","#FF3D8A"],
+ ["Max Lobovsky","CEO, Formlabs","Future of 3D Printing · Tue 11:30 · Kresge","ML","#8B7BFF","#25C9FF"],
+ ["Kent Larson","MIT Media Lab, City Science","Science of Making Cities · Thu 11:00 · Kresge","KL","#FF3D8A","#8B7BFF"],
+ ["Sherry Lassiter","President, Fab Foundation","Throughout · Inauguration Mon · panels Wed–Thu","SL","#19C99A","#FFC24B"],
+ ["Tomás Diez","Fab City Foundation","Fab City Day · Thu 09:30 · Kresge","TD","#25C9FF","#19C99A"]];
+
+/* ================= STATE ================= */
+const store={get(k,d){try{return JSON.parse(localStorage.getItem(k))??d}catch(e){return this._m?.[k]??d}},
+ set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){(this._m??={})[k]=v}}};
+let base=store.get("f26_base",null);
+let picks=new Set(store.get("f26_picks",["m04","m10","m15","m18","t14","t15","w14","h08","h33","f05"]));
+let meets=new Set(store.get("f26_meets",[0,1,2,4]));
+let alertsOn=store.get("f26_alerts",false);
+let curDay=store.get("f26_day",0);
+const fired=new Set();
+
+/* ================= HELPERS ================= */
+const $=q=>document.querySelector(q);
+const toast=m=>{const t=$("#toast");t.textContent=m;t.classList.add("on");clearTimeout(t._x);t._x=setTimeout(()=>t.classList.remove("on"),2600)};
+const walk=v=>{if(v.lat==null||!base)return null;
+ const R=6371000,r=x=>x*Math.PI/180;
+ const a=Math.sin(r(v.lat-base.lat)/2)**2+Math.cos(r(base.lat))*Math.cos(r(v.lat))*Math.sin(r(v.lng-base.lng)/2)**2;
+ return Math.max(1,Math.round(2*R*Math.asin(Math.sqrt(a))*1.35/78))};
+const gmaps=v=>{const d=encodeURIComponent(v.ad);
+ return v.lat==null?"https://fab26.fabevent.org/programs/venues":
+ base?`https://www.google.com/maps/dir/?api=1&origin=${base.lat},${base.lng}&destination=${d}&travelmode=walking`
+ :`https://www.google.com/maps/dir/?api=1&destination=${d}&travelmode=walking`};
+const findEv=id=>{for(const d of DAYS){const e=d.ev.find(x=>x[0]===id);if(e)return{d,e}}};
+
+/* ================= MAP ================= */
+const map=L.map("map",{zoomControl:false}).setView(base?[base.lat,base.lng]:[42.3592,-71.0925],15);
+L.control.zoom({position:"topright"}).addTo(map);
+L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",{maxZoom:19,attribution:"&copy; OSM &copy; CARTO"}).addTo(map);
+Object.values(VEN).forEach(v=>{if(v.lat==null)return;
+ L.circleMarker([v.lat,v.lng],{radius:9,color:"#fff",weight:2.5,fillColor:v.hex,fillOpacity:1}).addTo(map)
+ .bindTooltip(v.s,{permanent:true,direction:"top",offset:[0,-10],className:"vtip",opacity:1})
+ .on("click",()=>window.open(gmaps(v),"_blank"))});
+let baseMarker=null;
+function drawBase(){if(!base)return;
+ if(baseMarker)baseMarker.remove();
+ baseMarker=L.circleMarker([base.lat,base.lng],{radius:8,color:"#fff",weight:2.5,fillColor:"#FF6B35",fillOpacity:1})
+  .addTo(map).bindTooltip("YOUR BASE",{permanent:true,direction:"bottom",offset:[0,10],className:"vtip",opacity:1});
+ $("#cross").style.display="none";$("#setBase").style.display="none";
+ const p=$("#basePill");p.style.display="inline-flex";
+ const near=Object.values(VEN).filter(v=>v.lat!=null).map(v=>({v,m:walk(v)})).sort((a,b)=>a.m-b.m)[0];
+ p.textContent=`🏠 ${near.m} min → ${near.v.s} · change`;}
+$("#basePill").onclick=()=>{base=null;store.set("f26_base",null);baseMarker?.remove();
+ $("#cross").style.display="";$("#setBase").style.display="";$("#basePill").style.display="none";render()};
+$("#setBase").onclick=()=>{const c=map.getCenter();base={lat:c.lat,lng:c.lng};store.set("f26_base",base);drawBase();render();toast("Base saved — walk times updated")};
+$("#geo").onclick=()=>{const n=$("#geoNote");
+ if(!("geolocation"in navigator)){n.textContent="No GPS — drag the map & set base.";return}
+ if(!window.isSecureContext||location.protocol==="file:"){n.textContent="GPS works once hosted on https — for now drag & tap Set.";return}
+ n.textContent="Locating…";
+ navigator.geolocation.getCurrentPosition(
+  p=>{n.textContent="";map.setView([p.coords.latitude,p.coords.longitude],16)},
+  e=>{n.textContent=e.code===1?"GPS denied — drag the map & tap Set.":"No fix — drag & tap Set."},
+  {enableHighAccuracy:true,timeout:9000})};
+if(base)drawBase();
+
+/* ================= TABS ================= */
+const TABS=["Overview","Schedule","My Agenda","Speakers"];
+const tabsEl=$("#tabs");let cur=store.get("f26_tab",1);
+TABS.forEach((t,i)=>{const b=document.createElement("button");b.className="tab";b.setAttribute("role","tab");
+ b.onclick=()=>{cur=i;store.set("f26_tab",i);render()};tabsEl.appendChild(b)});
+function paintTabs(){[...tabsEl.children].forEach((b,i)=>{
+ b.classList.toggle("on",i===cur);b.setAttribute("aria-selected",i===cur);
+ b.innerHTML=TABS[i]+(i===2&&picks.size?`<span class="n">${picks.size}</span>`:"")})}
+const C=$("#content");
+function render(){paintTabs();C.innerHTML="";[renderOverview,renderSchedule,renderAgenda,renderSpeakers][cur]()}
+
+/* ================= SHARED PIECES ================= */
+const starSVG='<svg viewBox="0 0 20 20" fill="currentColor"><path d="M10 1.7l2.6 5.3 5.8.8-4.2 4.1 1 5.8L10 15l-5.2 2.7 1-5.8L1.6 7.8l5.8-.8z"/></svg>';
+const arrSVG='<svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M2.5 9.5L9.5 2.5M4 2.5h5.5V8"/></svg>';
+function evCard(e,opts={}){
+ const[id,tm,nm,vk,kind,room,must]=e,v=VEN[vk],w=walk(v),on=picks.has(id);
+ const c=document.createElement("div");c.className="ev"+(on?" sel":"");
+ c.innerHTML=`<div class="toprow">
+   <span class="vbox${v.dark?" dark":""}" style="--vc:${v.hex};background:${v.hex}">${v.s}${w?`<span class="wm">${w}′</span>`:""}</span>
+   ${room?`<span style="font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--txt-3);padding-top:4px">${room}</span>`:""}
+  </div>
+  <div class="nm">${nm} ${must?'<span class="badge">VOXEL·MIT</span>':""}</div>
+  <div class="botrow"><span class="kind ${kind}">${KINDS[kind]}</span>${opts.leave??""}</div>
+  <div class="acts">
+   <a class="golink" href="${gmaps(v)}" target="_blank" rel="noopener" aria-label="Directions to ${v.n}">${arrSVG}</a>
+   <button class="star${on?" on":""}" aria-pressed="${on}" aria-label="Toggle in my agenda">${starSVG}</button>
+  </div>`;
+ c.querySelector(".star").onclick=()=>{on?picks.delete(id):picks.add(id);
+  store.set("f26_picks",[...picks]);toast(on?"Removed from agenda":"Added — see My Agenda");render()};
+ return c;}
+function slots(evList){const m=new Map();
+ evList.forEach(e=>{(m.get(e[1])??m.set(e[1],[]).get(e[1])).push(e)});
+ return[...m.entries()].sort((a,b)=>a[0].localeCompare(b[0]));}
+function slotHead(tm,count){const ev=+tm.slice(0,2)>=18;
+ return`<div class="slot${ev?" evening":""}"><span class="tbig">${tm}</span><span class="tline"></span>${count>1?`<span class="tpar">${count} in parallel</span>`:""}</div>`;}
+
+/* ================= OVERVIEW ================= */
+function renderOverview(){
+ const all=DAYS.flatMap(d=>d.ev);
+ const vc={},kc={};all.forEach(e=>{vc[e[3]]=(vc[e[3]]||0)+1;kc[e[4]]=(kc[e[4]]||0)+1});
+ const maxV=Math.max(...Object.values(vc));
+ C.insertAdjacentHTML("beforeend",`
+  <h2 class="sec">Week at a <span class="grad">glance</span></h2>
+  <p class="sub">How the conference spreads across places, times and activity types — your navigation cheat-sheet.</p>
+  <div class="statrow">
+   <div class="stat"><b>${all.length}</b><span>Sessions</span></div>
+   <div class="stat"><b>${Object.keys(vc).filter(k=>k!=="O").length}</b><span>Venues</span></div>
+   <div class="stat"><b>${picks.size}</b><span>In my agenda</span></div>
+  </div>
+  <div class="panelbox"><h3>📍 Events per venue</h3><div class="vload">${
+   Object.entries(vc).sort((a,b)=>b[1]-a[1]).map(([k,n])=>{const v=VEN[k];
+    return`<div class="vl" style="--vc:${v.hex}"><span class="lbl">${v.s}</span><span class="bar"><i style="width:${n/maxV*100}%"></i></span><span class="ct">${n}</span></div>`}).join("")
+  }</div></div>
+  <div class="panelbox"><h3>🧩 Activity mix</h3><div class="kmix">${
+   Object.entries(kc).sort((a,b)=>b[1]-a[1]).map(([k,n])=>`<span class="kind ${k}">${KINDS[k]}<em>×${n}</em></span>`).join("")
+  }</div></div>
+  <div class="panelbox"><h3>🗓 Daily rhythm — venues in play & hours</h3><div class="daystrip">${
+   DAYS.map((d,i)=>{const vs=[...new Set(d.ev.map(e=>e[3]))];
+    const times=d.ev.map(e=>e[1]).sort();
+    return`<div class="ds"><span class="dl">${d.dw} ${d.dn}</span>
+     <span class="dots">${vs.map(k=>`<i style="--vc:${VEN[k].hex}" title="${VEN[k].n}"></i>`).join("")}</span>
+     <span class="tm">${times[0]} → ${times[times.length-1]}</span></div>`}).join("")
+  }</div></div>
+  <p class="sub" style="margin-top:4px">Pattern to remember: <b style="color:#B9AFFF">mornings = Kresge</b> · <b style="color:#FFB48F">13:00 lunch = Media Lab</b> · <b style="color:#8FE9CF">14:30 = parallel workshops in Kendall</b> · evenings = social.</p>`);}
+
+/* ================= SCHEDULE ================= */
+function renderSchedule(){
+ C.insertAdjacentHTML("beforeend",`
+  <div class="prio"><p class="kick">SuperFabLab Bhutan · priority track</p>
+   <h3>Voxel Robotic Construction × MIT CBA</h3>
+   <ul><li><b>Mon–Wed 14:30</b><span>Fab Vine Voxel Assembly (3-day, Amira Abdel-Rahman & CBA) — Fab Hub, Event Space</span></li>
+   <li><b>Mon 11:15</b><span>CBA Legacy keynote · <b style="color:var(--cyn)">12:45</b> Gershenfeld — Kresge</span></li>
+   <li><b>Tue 14:30</b><span>Scalable Structural Robotic Assembly, Miana Smith (CBA) — E14, 6-633</span></li>
+   <li><b>Wed 14:30</b><span>Robotic Craft in the CBA Shops — E15, LL</span></li>
+   <li><b>Fri 18:00</b><span>Business meeting with CBA — E15 (confirm room & time)</span></li></ul></div>
+  <h2 class="sec">Schedule <span class="grad">· by time slot</span></h2>
+  <p class="sub">Full official program. Same time = same group; colored box = venue + your walk minutes; mono text = room. Series of 10-min talks are shown as one block (×n) — <a href="https://fab26.fabevent.org/programs/schedule" target="_blank" rel="noopener" style="text-decoration:underline">full lineup here</a>. Tap ★ to add to agenda.</p>
+  <div class="daypick" id="daypick"></div><div id="dayev"></div>`);
+ const dp=$("#daypick");
+ DAYS.forEach((d,i)=>{const b=document.createElement("button");b.className="dp"+(i===curDay?" on":"");
+  b.innerHTML=`<div class="dw">${d.dw}</div><div class="dn">${d.dn}</div>`;
+  b.onclick=()=>{curDay=i;store.set("f26_day",i);render()};dp.appendChild(b)});
+ const box=$("#dayev"),d=DAYS[curDay];
+ box.insertAdjacentHTML("beforeend",`<p class="sub" style="margin-bottom:2px"><b class="disp" style="font-size:15px;color:#fff">${d.dw} ${d.dn} · ${d.t}</b></p>`);
+ slots(d.ev).forEach(([tm,evs])=>{
+  box.insertAdjacentHTML("beforeend",slotHead(tm,evs.length));
+  const g=document.createElement("div");g.className="slotgrid";
+  evs.forEach(e=>g.appendChild(evCard(e)));box.appendChild(g)});}
+
+/* ================= AGENDA ================= */
+function renderAgenda(){
+ C.insertAdjacentHTML("beforeend",`<h2 class="sec">My Agenda</h2>
+  <p class="sub">Green time = when to leave your base (walk + 5 min). Alerts fire while the app is open; the calendar file carries the same alarms even when it isn't.</p>
+  <div class="atools">
+   <button class="abtn hot" id="ics"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v8m0 0l-3-3m3 3l3-3M3 13.5h10"/></svg>Add to calendar (.ics)</button>
+   <button class="abtn" id="alerts">${alertsOn?"🔔 Alerts on":"🔕 Enable leave-now alerts"}</button>
+  </div>`);
+ if(!picks.size){C.insertAdjacentHTML("beforeend",`<div class="empty">Nothing selected yet.<br>Open <b>Schedule</b> and tap ★ on sessions.</div>`);}
+ else DAYS.forEach(d=>{
+  const sel=d.ev.filter(e=>picks.has(e[0]));if(!sel.length)return;
+  C.insertAdjacentHTML("beforeend",`<p class="sub" style="margin:14px 0 2px"><b class="disp" style="font-size:15px;color:#fff">${d.dw} ${d.dn} · ${d.t}</b></p>`);
+  slots(sel).forEach(([tm,evs])=>{
+   C.insertAdjacentHTML("beforeend",slotHead(tm,evs.length));
+   const g=document.createElement("div");g.className="slotgrid";
+   evs.forEach(e=>{const v=VEN[e[3]],w=walk(v);let lv="";
+    if(w){const[a,b]=e[1].split(":").map(Number);const t=new Date(0,0,0,a,b-w-5);
+     lv=`<span class="leave">⏰ leave ${String(t.getHours()).padStart(2,"0")}:${String(t.getMinutes()).padStart(2,"0")}</span>`}
+    g.appendChild(evCard(e,{leave:lv}))});
+   C.appendChild(g)})});
+ $("#ics").onclick=exportICS;
+ $("#alerts").onclick=async()=>{
+  if(!alertsOn){if("Notification"in window&&Notification.permission!=="granted")await Notification.requestPermission();
+   alertsOn=true;toast("Alerts on while the app is open")}
+  else{alertsOn=false;toast("Alerts off")}
+  store.set("f26_alerts",alertsOn);render()};}
+
+/* ================= SPEAKERS ================= */
+function renderSpeakers(){
+ C.insertAdjacentHTML("beforeend",`<h2 class="sec">Speakers <span class="grad">· must-meet</span></h2>
+  <p class="sub">Where and when to find each. Your voxel collaborators are pre-flagged for the team.</p>`);
+ SPK.forEach((s,i)=>{const[nm,rl,wh,ini,a1,a2]=s,on=meets.has(i);
+  const el=document.createElement("div");el.className="sp"+(on?" on":"");
+  el.innerHTML=`<span class="av" style="--a1:${a1};--a2:${a2}">${ini}</span>
+   <div class="bd"><div class="nm">${nm}</div><div class="rl">${rl}</div><div class="wh">${wh}</div></div>
+   <button class="meet${on?" on":""}" aria-pressed="${on}">${on?"MUST MEET ✓":"+ Meet"}</button>`;
+  el.querySelector(".meet").onclick=()=>{on?meets.delete(i):meets.add(i);store.set("f26_meets",[...meets]);render()};
+  C.appendChild(el)});}
+
+/* ================= ICS ================= */
+function exportICS(){
+ if(!picks.size){toast("Pick sessions first ★");return}
+ const pad=n=>String(n).padStart(2,"0");
+ let out=["BEGIN:VCALENDAR","VERSION:2.0","PRODID:-//SuperFabLab Bhutan//FAB26//EN"];
+ picks.forEach(id=>{const{d,e}=findEv(id),[,tm,nm,vk]=e,v=VEN[vk],w=walk(v)||12;
+  const[Y,Mo,Da]=d.date.split("-").map(Number),[h,mi]=tm.split(":").map(Number);
+  const st=new Date(Y,Mo-1,Da,h,mi),en=new Date(st.getTime()+60*60000);
+  const fmt=dt=>`${dt.getFullYear()}${pad(dt.getMonth()+1)}${pad(dt.getDate())}T${pad(dt.getHours())}${pad(dt.getMinutes())}00`;
+  out.push("BEGIN:VEVENT",`UID:${id}@fab26.superfablab.bt`,
+   `DTSTART;TZID=America/New_York:${fmt(st)}`,
+   `DTEND;TZID=America/New_York:${fmt(en)}`,
+   `SUMMARY:FAB26 · ${nm}`,`LOCATION:${v.n}, ${v.ad}`,
+   `DESCRIPTION:Walk ${w} min from base. Directions: ${gmaps(v).replace(/,/g,"\\,")}`,
+   "BEGIN:VALARM","ACTION:DISPLAY",`TRIGGER:-PT${w+5}M`,
+   `DESCRIPTION:Leave now — ${w} min walk to ${v.s}`,"END:VALARM","END:VEVENT")});
+ out.push("END:VCALENDAR");
+ const a=document.createElement("a");
+ a.href=URL.createObjectURL(new Blob([out.join("\r\n")],{type:"text/calendar"}));
+ a.download="FAB26-my-agenda.ics";a.click();toast("Calendar file downloaded — open to import")}
+
+/* ================= LIVE ALERTS ================= */
+setInterval(()=>{if(!alertsOn||!base)return;
+ const now=new Date();
+ picks.forEach(id=>{if(fired.has(id))return;
+  const{d,e}=findEv(id),[,tm,nm,vk]=e,v=VEN[vk],w=walk(v);if(!w)return;
+  const[h,mi]=tm.split(":").map(Number);
+  const start=new Date(`${d.date}T${pad2(h)}:${pad2(mi)}:00`);
+  const leave=new Date(start-(w+5)*60000);
+  if(now>=leave&&now<start){fired.add(id);
+   const msg=`Leave now → ${nm} @ ${v.s} (${w} min walk)`;
+   if("Notification"in window&&Notification.permission==="granted")new Notification("FAB26 · time to go",{body:msg});
+   toast("🔔 "+msg);navigator.vibrate?.([180,90,180])}})},30000);
+const pad2=n=>String(n).padStart(2,"0");
+
+render();
+</script>
+</body>
+</html>
