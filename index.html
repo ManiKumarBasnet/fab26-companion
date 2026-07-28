@@ -654,6 +654,43 @@ function renderSpeakers(){
   C.appendChild(el)});}
 
 /* ================= TRIP ================= */
+const tripDaysWithPicks=()=>DAYS.map(d=>({d,sel:d.ev.filter(e=>picks.has(e[0])).slice().sort((a,b)=>a[1].localeCompare(b[1]))})).filter(x=>x.sel.length);
+function tripVisits(sel){const visits=[];sel.forEach(e=>{const v=VEN[e[4]],last=visits[visits.length-1];
+ if(last&&last.v===v)last.events.push(e);else visits.push({v,events:[e]});});return visits;}
+function buildTripText(){
+ const days=tripDaysWithPicks(),L=[];
+ L.push("FAB26 BOSTON — MY TRIP","SuperFabLab Bhutan · companion",base?"Base set · walk times & leave-by personalized":"No base set · route only (no walk times)","");
+ days.forEach(({d,sel})=>{
+  L.push(`=== ${d.dw} ${d.dn} · ${d.t} ===`);
+  const visits=tripVisits(sel);let prevV=null,totalWalk=0;
+  visits.forEach((vt,idx)=>{const v=vt.v,firstStart=vt.events[0][1],mapped=v.lat!=null;
+   if(idx===0){if(base&&mapped){const w=walk(v);if(w!=null){totalWalk+=w;L.push(`  From your base: walk ${w} min · leave by ${shiftT(firstStart,-(w+5))}`);}}}
+   else{const w=(prevV&&mapped)?walkBetween(prevV,v):null;
+    if(w!=null){totalWalk+=w;L.push(`  Walk ${w} min: ${prevV.s} -> ${v.s} · leave by ${shiftT(firstStart,-(w+5))}`);}
+    else L.push(`  Move: ${prevV?prevV.s+" -> ":""}${v.s}`);}
+   L.push(`  ${mapped?"("+(idx+1)+")":"(*)"} ${v.n}`);
+   vt.events.forEach(e=>L.push(`      ${e[1]}${e[2]?"-"+e[2]:""}  ${e[3]}${e[6]?"  ["+e[6]+"]":""}`));
+   prevV=v;});
+  const dayEnd=sel.reduce((mm,e)=>{const t=e[2]||e[1];return toMin(t)>toMin(mm)?t:mm;},sel[0][2]||sel[0][1]);
+  L.push(`  — ${sel[0][1]} to ${dayEnd} · ${visits.length} stop${visits.length>1?"s":""}${base?` · ~${totalWalk} min walking`:""}`,"");
+ });
+ L.push("Live companion: "+location.origin+location.pathname);
+ return L.join("\n");
+}
+function downloadTrip(){
+ if(!tripDaysWithPicks().length){toast("Pick sessions first ★");return;}
+ const a=document.createElement("a");
+ a.href=URL.createObjectURL(new Blob([buildTripText()],{type:"text/plain;charset=utf-8"}));
+ a.download="FAB26-my-trip.txt";a.click();toast("Trip downloaded — share the file");
+}
+async function shareTrip(){
+ if(!tripDaysWithPicks().length){toast("Pick sessions first ★");return;}
+ const text=buildTripText();
+ if(navigator.share){try{await navigator.share({title:"FAB26 · My Trip",text});return;}
+  catch(e){if(e&&e.name==="AbortError")return;}}
+ try{await navigator.clipboard.writeText(text);toast("Trip copied — paste to your colleagues");}
+ catch(e){downloadTrip();}
+}
 function renderTrip(){
  C.insertAdjacentHTML("beforeend",`<h2 class="sec">My <span class="grad">Trip</span></h2>
   <p class="sub">Your starred day mapped as a walking route — where to go, in order, and when to leave. Set your base on the map for personal walk times & "leave by" alerts.</p>`);
@@ -661,6 +698,10 @@ function renderTrip(){
  if(!withPicks.length){clearRoute();
   C.insertAdjacentHTML("beforeend",`<div class="empty">No sessions selected yet.<br>Open <b>Schedule</b> and tap ★, then come back to see your route.</div>`);return;}
  if(!withPicks.some(x=>x.i===tripDay))tripDay=withPicks[0].i;
+ C.insertAdjacentHTML("beforeend",`<div class="atools">
+   <button class="abtn hot" id="shareTrip">🔗 Share my trip</button>
+   <button class="abtn" id="dlTrip">⬇ Download (.txt)</button>
+  </div><p class="sub" style="margin:-8px 0 12px">Exports your whole trip (all starred days) — send it to your colleagues.</p>`);
  const dp=document.createElement("div");dp.className="daypick";
  withPicks.forEach(({i,n})=>{const d=DAYS[i];const b=document.createElement("button");b.className="dp"+(i===tripDay?" on":"");
   b.innerHTML=`<div class="dw">${d.dw}</div><div class="dn">${d.dn}</div><div class="dw" style="color:var(--org)">${n}★</div>`;
@@ -668,10 +709,7 @@ function renderTrip(){
  C.appendChild(dp);
  const day=DAYS[tripDay];
  const sel=day.ev.filter(e=>picks.has(e[0])).slice().sort((a,b)=>a[1].localeCompare(b[1]));
- /* group consecutive same-venue events into visits */
- const visits=[];
- sel.forEach(e=>{const v=VEN[e[4]];const last=visits[visits.length-1];
-  if(last&&last.v===v)last.events.push(e);else visits.push({v,events:[e]});});
+ const visits=tripVisits(sel);
  drawRoute(visits);
  C.insertAdjacentHTML("beforeend",`<button class="abtn" id="tripUp" style="margin:0 0 12px">🗺 Show route on map ↑</button>`);
  /* build timeline + tallies */
@@ -710,6 +748,7 @@ function renderTrip(){
  C.insertAdjacentHTML("beforeend",`<div class="trip">${rows.join("")}</div>`);
  if(!base)C.insertAdjacentHTML("beforeend",`<p class="sub" style="margin-top:10px;color:#FFD9A8">Tip: drag the map & tap <b>“Set my base here”</b> to get walk minutes and “leave by” times.</p>`);
  $("#tripUp").onclick=()=>window.scrollTo({top:0,behavior:"smooth"});
+ $("#shareTrip").onclick=shareTrip;$("#dlTrip").onclick=downloadTrip;
 }
 
 /* ================= ICS ================= */
